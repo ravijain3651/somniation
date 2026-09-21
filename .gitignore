@@ -40,3 +40,9 @@ testem.log
 Thumbs.db
 .vercel
 .env*
+
+# Firebase emulators
+/emulator-data/*
+!/emulator-data/.gitkeep
+*-debug.log
+.firebase/

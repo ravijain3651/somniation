@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admin flag: users may only read their own doc; never writable from clients.
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /timesheets/{id} {
+      // resource == null lets an employee probe their own not-yet-created week.
+      allow read: if request.auth != null
+        && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+
+      // Employees: own doc only, id must be {uid}_{weekEnding}, not yet invoiced,
+      // and cannot set invoice fields.
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.weekEnding
+        && request.resource.data.invoiced == false
+        && request.resource.data.invoiceNumber == null;
+
+      allow update: if request.auth != null
+        && ((resource.data.userId == request.auth.uid
+              && request.resource.data.userId == request.auth.uid
+              && id == request.auth.uid + '_' + request.resource.data.weekEnding
+              && resource.data.invoiced == false
+              && request.resource.data.invoiced == false
+              && request.resource.data.invoiceNumber == null)
+            // Admins: only invoiced / invoiceNumber (and updatedAt) may change.
+            || (isAdmin()
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['invoiced', 'invoiceNumber', 'updatedAt'])));
+
+      allow delete: if false;
+    }
+  }
+}

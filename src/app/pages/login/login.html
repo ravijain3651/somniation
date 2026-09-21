@@ -1,0 +1,27 @@
+<section class="section">
+  <div class="container max-w-md">
+    <div class="card p-8">
+      <h1 class="mb-1 text-2xl font-extrabold text-foreground">Employee login</h1>
+      <p class="mb-6 text-foreground-2">Sign in to submit timesheets or manage invoices.</p>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="grid gap-4" novalidate>
+        <div>
+          <label for="email" class="mb-1 block text-sm font-semibold">Email</label>
+          <input id="email" type="email" formControlName="email" autocomplete="username" class="form-input" />
+        </div>
+        <div>
+          <label for="password" class="mb-1 block text-sm font-semibold">Password</label>
+          <input id="password" type="password" formControlName="password" autocomplete="current-password" class="form-input" />
+        </div>
+
+        @if (error()) {
+          <p class="m-0 text-sm text-red-600" role="alert">{{ error() }}</p>
+        }
+
+        <button type="submit" class="btn btn-primary btn-lg w-full" [disabled]="busy()">
+          {{ busy() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,114 @@
+<section class="section">
+  <div class="container grid gap-8">
+    <h1 class="m-0 text-2xl font-extrabold text-foreground">Admin: timesheets &amp; invoices</h1>
+
+    @if (error()) { <p class="m-0 text-sm text-red-600" role="alert">{{ error() }}</p> }
+    @if (message()) { <p class="m-0 text-sm text-green-700" role="status">{{ message() }}</p> }
+
+    <div class="card p-6">
+      <h2 class="mb-4 text-lg font-bold">Timesheets</h2>
+      <div class="mb-4 flex flex-wrap gap-3">
+        <select class="form-input max-w-xs" aria-label="Filter by employee" (change)="employeeFilter.set($any($event.target).value)">
+          <option value="">All employees</option>
+          @for (e of employees(); track e) { <option [value]="e">{{ e }}</option> }
+        </select>
+        <select class="form-input max-w-xs" aria-label="Filter by status" (change)="statusFilter.set($any($event.target).value)">
+          <option value="all">All</option>
+          <option value="open">Not invoiced</option>
+          <option value="invoiced">Invoiced</option>
+        </select>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-border">
+              <th class="py-2 pr-4">Employee</th>
+              <th class="py-2 pr-4">Week ending</th>
+              <th class="py-2 pr-4">Hours</th>
+              <th class="py-2 pr-4">Status</th>
+              <th class="py-2">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of visible(); track s.userId + s.weekEnding) {
+              <tr class="border-b border-border">
+                <td class="py-2 pr-4">{{ s.userEmail }}</td>
+                <td class="py-2 pr-4">{{ s.weekEnding }}</td>
+                <td class="py-2 pr-4">{{ s.totalHours }}</td>
+                <td class="py-2 pr-4">{{ s.invoiced ? 'Invoiced ' + s.invoiceNumber : 'Not invoiced' }}</td>
+                <td class="py-2">
+                  @if (s.receiptUrl) {
+                    <a [href]="s.receiptUrl" target="_blank" rel="noopener" class="text-primary underline">View</a>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="py-4 text-foreground-2">{{ loading() ? 'Loading…' : 'No timesheets found.' }}</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card p-6">
+      <h2 class="mb-4 text-lg font-bold">Create invoice</h2>
+      <form [formGroup]="form" (ngSubmit)="generate()" class="grid gap-4" novalidate>
+        <div>
+          <label for="inv-employee" class="mb-1 block text-sm font-semibold">Employee</label>
+          <select id="inv-employee" class="form-input max-w-md" (change)="setEmployee($any($event.target).value)">
+            <option value="">Select an employee…</option>
+            @for (e of employees(); track e) { <option [value]="e">{{ e }}</option> }
+          </select>
+        </div>
+
+        @if (invoiceEmployee()) {
+          <fieldset class="m-0 border-0 p-0">
+            <legend class="mb-1 text-sm font-semibold">Uninvoiced weeks</legend>
+            @for (s of openWeeks(); track s.weekEnding) {
+              <label class="flex items-center gap-2 py-1">
+                <input type="checkbox" [checked]="selectedWeeks().has(s.weekEnding)" (change)="toggleWeek(s.weekEnding, $any($event.target).checked)" />
+                {{ s.weekEnding }} ({{ s.totalHours }} h)
+              </label>
+            } @empty {
+              <p class="m-0 text-sm text-foreground-2">No uninvoiced weeks for this employee.</p>
+            }
+          </fieldset>
+        }
+
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label for="inv-number" class="mb-1 block text-sm font-semibold">Invoice number</label>
+            <input id="inv-number" type="text" formControlName="invoiceNumber" class="form-input" />
+          </div>
+          <div>
+            <label for="inv-date" class="mb-1 block text-sm font-semibold">Invoice date</label>
+            <input id="inv-date" type="date" formControlName="invoiceDate" class="form-input" />
+          </div>
+          <div>
+            <label for="inv-terms" class="mb-1 block text-sm font-semibold">Payment terms</label>
+            <select id="inv-terms" formControlName="terms" class="form-input">
+              @for (t of terms; track t) { <option [ngValue]="t">Net {{ t }}</option> }
+            </select>
+            <p class="mt-1 mb-0 text-xs text-foreground-2">Due {{ dueLabel() }}</p>
+          </div>
+          <div>
+            <label for="inv-rate" class="mb-1 block text-sm font-semibold">Hourly rate</label>
+            <input id="inv-rate" type="number" min="0" step="0.01" formControlName="hourlyRate" class="form-input" />
+          </div>
+        </div>
+
+        <p class="m-0 text-lg font-bold">Total: {{ money(total()) }}</p>
+
+        <div class="flex flex-wrap gap-3">
+          <button type="submit" class="btn btn-primary" [disabled]="busy() || !pickedSheets().length">Generate PDF</button>
+          @if (generated()) {
+            <button type="button" class="btn btn-outline" (click)="markInvoiced()" [disabled]="busy()">
+              Mark as invoiced ({{ generated()!.number }})
+            </button>
+          }
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
