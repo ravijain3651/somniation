@@ -57,7 +57,15 @@
 
     <div class="mt-12 flex flex-wrap justify-between gap-2 border-t border-border pt-6">
       <p class="m-0">© {{ year }} Somniation LLC. All rights reserved.</p>
-      <p class="m-0 italic">Dream it. Run it.</p>
+      <p class="m-0 flex items-center gap-4">
+        @if (auth.signedIn()) {
+          <a [routerLink]="auth.landingUrl()" class="text-foreground-2 hover:text-primary">{{ auth.isAdmin() ? 'Admin' : 'Timesheet' }}</a>
+          <button type="button" (click)="signOut()" class="cursor-pointer text-foreground-2 hover:text-primary">Sign out</button>
+        } @else {
+          <a routerLink="/login" class="text-foreground-2 hover:text-primary">Employee Login</a>
+        }
+        <span class="italic">Dream it. Run it.</span>
+      </p>
     </div>
   </div>
 </footer>

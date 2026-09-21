@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard, authGuard } from './core/auth.guard';
 
 export const routes: Routes = [
   {
@@ -20,6 +21,23 @@ export const routes: Routes = [
     path: 'contact',
     loadComponent: () => import('./pages/contact/contact').then((m) => m.Contact),
     title: 'Contact — Somniation',
+  },
+  {
+    path: 'login',
+    loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+    title: 'Employee login — Somniation',
+  },
+  {
+    path: 'timesheet',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/timesheet/timesheet').then((m) => m.TimesheetPage),
+    title: 'Timesheet — Somniation',
+  },
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./pages/admin/admin').then((m) => m.Admin),
+    title: 'Admin — Somniation',
   },
   {
     path: '**',

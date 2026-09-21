@@ -1,0 +1,57 @@
+<section class="section">
+  <div class="container max-w-2xl">
+    <div class="card p-8">
+      <h1 class="mb-1 text-2xl font-extrabold text-foreground">Weekly timesheet</h1>
+      <p class="mb-6 text-foreground-2">Log your hours for the week (Mon–Sun) and attach your receipt.</p>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="grid gap-5" novalidate>
+        <div>
+          <label for="weekEnding" class="mb-1 block text-sm font-semibold">Week ending (Sunday)</label>
+          <input id="weekEnding" type="date" formControlName="weekEnding" [max]="maxWeek" (change)="onWeekChange()" class="form-input" />
+          <p class="mt-1 mb-0 text-sm text-foreground-2">{{ weekRange() }}</p>
+        </div>
+
+        @if (locked()) {
+          <p class="m-0 rounded-md bg-primary-soft p-3 text-sm" role="status">
+            This week was invoiced ({{ existing()?.invoiceNumber }}) and can no longer be edited.
+          </p>
+        }
+
+        <div formGroupName="hours" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          @for (day of days; track day) {
+            <div>
+              <label [for]="'h-' + day" class="mb-1 block text-sm font-semibold">{{ day }}</label>
+              <input [id]="'h-' + day" type="number" min="0" max="24" step="0.25" [formControlName]="day" class="form-input" />
+              @if (form.controls.hours.controls[day].touched && form.controls.hours.controls[day].invalid) {
+                <p class="mt-1 mb-0 text-xs text-red-600">0–24 only</p>
+              }
+            </div>
+          }
+        </div>
+
+        <p class="m-0 text-lg font-bold">Total: {{ total() }} hours</p>
+
+        <div>
+          <label for="receipt" class="mb-1 block text-sm font-semibold">Receipt image (PNG or JPG)</label>
+          <input id="receipt" type="file" accept="image/png,image/jpeg" (change)="onFile($event)" [disabled]="locked()" class="form-input" />
+          @if (existing()?.receiptUrl; as url) {
+            <p class="mt-1 mb-0 text-sm">
+              <a [href]="url" target="_blank" rel="noopener" class="text-primary underline">Current receipt</a>
+              @if (!locked()) { (choose a file to replace it) }
+            </p>
+          }
+          @if (receiptError()) {
+            <p class="mt-1 mb-0 text-sm text-red-600" role="alert">{{ receiptError() }}</p>
+          }
+        </div>
+
+        @if (error()) { <p class="m-0 text-sm text-red-600" role="alert">{{ error() }}</p> }
+        @if (message()) { <p class="m-0 text-sm text-green-700" role="status">{{ message() }}</p> }
+
+        <button type="submit" class="btn btn-primary btn-lg" [disabled]="locked() || saving() || loading()">
+          {{ saving() ? 'Saving…' : existing() ? 'Resubmit timesheet' : 'Submit timesheet' }}
+        </button>
+      </form>
+    </div>
+  </div>
+</section>

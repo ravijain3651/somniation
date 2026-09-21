@@ -1,12 +1,12 @@
 # Somniation: Project Structure
 
 Snapshot of the codebase so it doesn't need to be re-read. Update it when structure changes.
-Last analyzed: 2026-09-20 (commit 4ebb983, branch `main`).
+Last analyzed: 2026-09-20 (branch `feature/auth-timesheet-invoice`).
 
 ## What it is
 Marketing website for Somniation, an IT services company. Angular 22, standalone components, signals,
-Tailwind CSS v4, statically prerendered, deployed on Vercel. There is no backend and no Firebase yet
-(see `/plan.md` for the planned timesheet/invoicing system).
+Tailwind CSS v4, statically prerendered, deployed on Vercel. The public site has no backend; the
+employee timesheet/invoicing system (`/login`, `/timesheet`, `/admin`) uses Firebase (see `/plan.md`).
 
 ## Stack and tooling
 - Angular `^22.1` (`@angular/build:application` builder, `outputMode: "static"`, SSR prerender of all routes)
@@ -14,7 +14,8 @@ Tailwind CSS v4, statically prerendered, deployed on Vercel. There is no backend
 - Tests: `ng test` (`@angular/build:unit-test`, Vitest + jsdom). Only `src/app/app.spec.ts` exists.
 - TypeScript `~6.0`, strict-ish flags (`noPropertyAccessFromIndexSignature`, `noImplicitOverride`, `noImplicitReturns`)
 - Prettier is installed, but there is no prettier config file
-- npm scripts: `start` (ng serve, port 4200), `build`, `watch`, `test`
+- npm scripts: `start` (ng serve, port 4200), `build`, `watch`, `test`, `emulators` (Firebase emulators with `./emulator-data` import/export)
+- The Angular CLI needs Node >= 22.22 (run `nvm use node`). Java is needed for the Firestore emulator.
 - Deploy: `vercel.ts` builds with `ng build`, serves `dist/somniation/browser` as a plain static site
   (`framework: null`), and rewrites everything to `/index.csr.html`. The Vercel Angular preset is
   bypassed on purpose (see the comment in the file).
@@ -26,7 +27,9 @@ Tailwind CSS v4, statically prerendered, deployed on Vercel. There is no backend
 ## Repository layout
 ```
 angular.json, package.json, tsconfig*.json, vercel.ts, .postcssrc.json
-plan.md                      Planned timesheet/invoicing feature (not implemented)
+plan.md                      Timesheet/invoicing plan (sections 1-6 implemented; 7 production rollout deferred)
+firebase.json, .firebaserc, firestore.rules, storage.rules, firestore.indexes.json   Emulator + security rules
+emulator-data/               Emulator import/export dir (contents gitignored)
 docs/                        This documentation
 assets/brand-source/         Source logo/icon images (not served)
 public/                      Static assets served from site root
@@ -49,8 +52,9 @@ app.ts, app.html             Root shell: <app-header/> <main><router-outlet/></m
 app.config.ts                provideRouter (scroll restore 'top', anchor scrolling), client hydration with
                              event replay, app initializer sets ViewportScroller offset [0, 92] for the sticky header
 app.config.server.ts         Merges appConfig with provideServerRendering(withRoutes(serverRoutes))
-app.routes.ts                Lazy loadComponent routes with titles: '', services, about, contact, '**' -> NotFound
-app.routes.server.ts         '**' -> RenderMode.Prerender
+app.routes.ts                Lazy loadComponent routes with titles: '', services, about, contact, login,
+                             timesheet (authGuard), admin (adminGuard), '**' -> NotFound
+app.routes.server.ts         login/timesheet/admin -> RenderMode.Client, '**' -> RenderMode.Prerender
 app.spec.ts                  Tests that the app renders the header brand and footer
 
 core/
@@ -68,10 +72,19 @@ core/
                              All directives use afterNextRender, so they are no-ops on the server and with
                              prefers-reduced-motion.
 
+  auth.service.ts            AuthService: user/isAdmin signals, ready promise, signIn/signOut. Browser-only,
+                             loads Firebase via dynamic import (SDK stays out of the initial bundle)
+  auth.guard.ts              authGuard, adminGuard (/admins/{uid} check via AuthService)
+  firebase/client.ts         getFirebase(): memoised init, connects emulators when environment.useEmulators
+  timesheet.service.ts       Firestore /timesheets + Storage receipts; markInvoiced batch
+  timesheet.model.ts, dates.ts   Types/constants; Mon-Sun week helpers (weekEnding = Sunday)
+  invoice-config.ts          Issuer details (PLACEHOLDERS to fill in), payment terms
+  invoice-pdf.ts             Cents-based invoice maths + pdfmake PDF (lazy-loaded) download
+
 layout/
   header/                    Sticky header (host class 'sticky top-0 z-[100]'), nav links, mobile menu,
                              theme toggle, scrolled-state signal
-  footer/                    Footer: services list from SERVICES, ContactInfoService, current year
+  footer/                    Footer: services list, ContactInfoService, year, Employee Login / Timesheet|Admin + Sign out
 
 pages/                       One standalone component per route (each with .ts + .html, no separate .css)
   home/                      Hero, services overview, stats, differentiators, process, testimonials,
@@ -81,6 +94,9 @@ pages/                       One standalone component per route (each with .ts +
   contact/                   Signal Forms contact form (form/FormField/required/minLength/email/submit from
                              '@angular/forms/signals'); no backend, submit only sets sent=true. Contact info
                              card, FAQ accordion.
+  login/                     Shared employee/admin login (reactive form, returnUrl support)
+  timesheet/                 Weekly hours form + receipt upload; read-only once invoiced
+  admin/                     Timesheet dashboard with filters + invoice form/PDF/mark-as-invoiced
   not-found/                 404
 ```
 
@@ -100,12 +116,9 @@ pages/                       One standalone component per route (each with .ts +
 4. `@theme inline` and `@theme`, which map tokens into Tailwind namespaces
 5. `/* Base */`, then `/* Shared components */` (reusable classes)
 
-## Implications for the planned timesheet feature (`plan.md`)
-- No `environment` files, Firebase packages or `firebase.json` exist yet.
-- The build is fully static prerender with catch-all `RenderMode.Prerender`. Authenticated routes
-  (`/login`, `/timesheet`, `/admin`) should use `RenderMode.Client` in `app.routes.server.ts`, and
-  Firebase init must be browser-only.
-- `vercel.ts` already rewrites unknown paths to `/index.csr.html`, so client-only routes work in production.
-- The bundled logo for invoices can live in `public/images/brand/` (`logo.png` already exists).
-- Header nav links are a hard-coded `links` array in `header.ts`; a login/timesheet link would go there.
-- `provideClientHydration` is on. Auth state must not change server-rendered markup.
+## Firebase notes
+- `@angular/fire` is NOT used: its latest release only supports Angular 20. We use the plain `firebase` SDK.
+- `src/environments/environment.ts` (prod, placeholder config) and `environment.development.ts` (emulators);
+  `ng serve` uses development via fileReplacements. Real prod config is deferred (plan section 7).
+- Emulator ports: Auth 9099, Firestore 8080, Storage 9199, UI 4000. Create users in the UI; add an
+  `/admins/{uid}` doc to make an admin.
